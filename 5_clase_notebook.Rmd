@@ -1,0 +1,199 @@
+---
+title: "Computacion estadistica - Clase 5 - dplyr"
+output: html_notebook
+---
+#Tabla de contenido 
+
+- [Nombre columnas](#nombre-columnas)
+- [Funcion `select(data_frame, columnas_que_quiero)`](#funcion-selectdata_frame-columnas_que_quiero)
+- [Funcion `filter(data_frame, condición)`](#funcion-filterdata_frame-condición)
+- [combinando filter y select](#combinando-filter-y-select)
+- [`group_by()` + `summarise()`](#group_by--summarise)
+- [🛠️ Limpieza y unificación de categorías en una variable](#️-limpieza-y-unificación-de-categorías-en-una-variable)
+- [desviacion estandar con summarise](#desviacion-estandar-con-summarise)
+- [`mutate()`](#mutate)
+- [Garantizar usar la funcion de una libreria especifica](#garantizar-usar-la-funcion-de-una-libreria-especifica)
+- [Guardar en excel `writexl`](#guardar-en-excel-writexl)
+-   `%>%` es como un "luego" y se hace oprimiendo `ctrl` + `shift` + `m`.
+
+Cargamos datos y la libreria dplyr.
+
+```{r}
+library(readr)
+library(dplyr)
+marketing <- read_csv("C:/Users/naari/OneDrive/Desktop/computacion/BD/marketing.csv")
+marketing
+```
+
+# Nombre columnas
+
+```{r}
+colnames(marketing)
+```
+
+[Ir a la Tabla de Contenido.](#tabla-de-contenido)
+
+# Funcion `select(data_frame, columnas_que_quiero)`
+
+Sirve para seleccionar columnas específicas de un data frame (como decir: “solo quiero ver estas variables”)
+
+-   Sin dplyr
+
+```{r}
+marketing[,c(4,6)] 
+```
+
+-   Con dplyr
+
+```{r}
+marketing %>% select(Education,Year_Birth)
+```
+
+seleccionar todas las columnas menos Income y educacion:
+```{r}
+marketing %>% select(-c(Income, Education))
+```
+
+# Funcion `filter(data_frame, condición)`
+
+ Se usa para filtrar filas según condiciones lógicas (como decir: “solo quiero las observaciones que cumplen esto”)
+ 
+```{r}
+marketing %>% filter(Income> 100000)
+```
+Dos condiciones:
+```{r}
+marketing %>% filter(Income> 100000, Marital_Status == "Single")
+```
+
+# combinando filter y select
+
+```{r}
+marketing %>% select(Education) %>% filter(Income> 100000) # no encuentra Income porque solo seleccionamos educación, por consiguiente: R solo puede ver educacion y no income
+```
+Solucion al error:
+```{r}
+marketing %>% select(Education, Income) %>% filter(Income> 100000)
+```
+Otra solucion:
+```{r}
+marketing %>% filter(Income> 100000) %>% select(Education) # el filtro puede ver toda la tabla y por eso funciona, luego seleccionas la variable de interés ya filtrada.
+
+```
+
+
+#  `group_by()` + `summarise()`
+
+Se usan para **agrupar datos** y luego **resumir** con estadísticas como promedio, suma, conteo, etc.
+
+**Estructura:**
+
+
+```
+data_frame %>%
+  group_by(columna_que_agrupa) %>%
+  summarise(columna_nueva = funcion(columna_existente))
+```
+
+
+🔸 Ejemplo: ingreso promedio por nivel educativo
+
+```{r}
+marketing %>%
+  group_by(Education) %>%
+  summarise(ingreso_promedio = mean(Income, na.rm = TRUE))
+```
+
+Agrupa por `Education` y calcula el promedio de `Income` para cada grupo.
+
+* Puedes agrupar por varias columnas:
+
+```{r}
+marketing %>%
+  group_by(Education, Marital_Status) %>%
+  summarise(ingreso = mean(Income, na.rm = TRUE))
+```
+
+Siempre poner `na.rm = TRUE` si hay NAs.
+
+* ingreso promedio de los casados, ingreso promedio de los solteros
+```{r}
+marketing %>% group_by(Marital_Status) %>% summarise(Ingreso = mean(Income))
+```
+
+## 🛠️ Limpieza y unificación de categorías en una variable
+
+Renombrando categorias:
+```{r}
+marketing$Marital_Status[marketing$Marital_Status == "YOLO"] = "Single" # renombrar
+marketing$Marital_Status[marketing$Marital_Status == "Alone"] = "Single"
+marketing$Marital_Status[marketing$Marital_Status == "Absurd"] = "Single"
+```
+segunda forma de renombrar:
+```{r}
+marketing$Marital_Status[marketing$Marital_Status %in% c("YOLO","Alone","Absurd")] = "Single"
+```
+
+Gracias al paso anterior, tenemos una mejor aproximacion a ingresos por estado marital:
+
+```{r}
+marketing %>% group_by(Marital_Status) %>% summarise(Ingreso = mean(Income))
+```
+
+
+## desviacion estandar con summarise
+Sacar media, desviacion estandar y el numero de personas del income por estado civil
+
+```{r}
+marketing %>% group_by(Marital_Status) %>%
+  summarise(Income_media=mean(Income), Income_sd = sd(Income), Income_personas=n())
+```
+
+# `Mutate()`
+Crear nuevas columnas o modificar existentes.
+
+**Estructura:**
+
+```
+data_frame %>% 
+  mutate(nueva_columna = operación_sobre_columnas_existentes)
+```
+
+
+```{r}
+marketing %>% group_by(Marital_Status) %>%
+  summarise(Income_media=mean(Income), Income_sd = sd(Income), Income_personas=n())%>%
+  mutate(cv =Income_sd/Income_media*100)
+```
+
+
+
+?dplyr::filter
+
+# Garantizar usar la funcion de una libreria especifica
+
+```{r}
+marketing %>% dplyr::group_by(Marital_Status) %>%
+  dplyr::summarise(Ingreso=mean(Income), Income_sd = sd(Income), personas=n()) %>%
+  dplyr::mutate(cv =Income_sd/Ingreso*100)
+```
+
+
+# Guardar en excel `writexl`
+
+ver donde estamos trabajando
+```{r}
+getwd()
+```
+tenemos un df que queremos guardar:
+
+```{r}
+filtro= marketing %>% dplyr::group_by(Marital_Status) %>%
+  dplyr::summarise(Ingreso=mean(Income), Income_sd = sd(Income), personas=n()) %>%
+  dplyr::mutate(cv =Income_sd/Ingreso*100)
+```
+guardamos:
+```{r}
+writexl::write_xlsx(filtro, "filtro_poderoso.xlsx") #guardar a un excel
+```
+

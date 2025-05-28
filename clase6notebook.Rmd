@@ -1,0 +1,219 @@
+---
+title: "Computacion estadistica - Clase 6"
+output: html_notebook
+---
+
+# Tabla de Contenido {#tabla-de-contenido}
+
+-   [Descarga de datos y carga de `dplyr`](#descarga-de-datos-y-carga-de-dplyr)
+-   [Agrupar y resumir con `group_by` + `summarise`](#agrupar-y-resumir-con-group_by--summarise)
+-   [Filtrar](#filtrar)
+-   [Joins](#joins)
+-   [Gráficos](#gráficos)
+    -   [Gráfico de barras](#gráfico-de-barras)
+    -   [Histogramas](#histogramas)
+    -   [Boxplot ("Gráfico de caja")](#boxplot-gráfico-de-caja)
+
+# Carga de datos `marketing.csv` y carga de `dplyr` {#descarga-de-datos-y-carga-de-dplyr}
+
+```{r}
+library(readr)
+marketing <- read_csv("BD/marketing.csv")
+marketing
+
+library(dplyr)
+```
+
+[🔝 Volver a tabla de contenido](#tabla-de-contenido)
+
+# Agrupar y resumir con `group_by` + `summarise`
+
+> Si analizas cada uno, va de lo grande a lo chico, de lo general a lo específico.
+
+Ingreso promedio por nivel educativo:
+
+```{r}
+marketing %>% 
+  group_by(Education) %>% 
+  summarise(Ingreso = mean(Income, na.rm = TRUE)) # remove NA = TRUE
+```
+
+Ingreso promedio por educación y estado civil:
+
+```{r}
+marketing %>% 
+  group_by(Education, Marital_Status) %>% 
+  summarise(Ingreso = mean(Income, na.rm = TRUE))
+```
+
+[🔝 Volver a tabla de contenido](#tabla-de-contenido)
+
+# Filtrar {#filtrar}
+
+Solo personas casadas:
+
+```{r}
+marketing %>% filter(Marital_Status == "Married")
+```
+
+Casados o divorciados (nivel pollito 😄):
+
+```{r}
+marketing %>% filter(Marital_Status %in% c("Married", "Divorced"))
+```
+
+*Evitar uso de notación científica*
+
+```{r}
+options(scipen = 99)
+```
+
+[🔝 Volver a tabla de contenido](#tabla-de-contenido)
+
+# joins {#joins}
+
+| Función        | Qué hace                                          |
+|----------------|---------------------------------------------------|
+| `filter()`     | Filtra filas (por ejemplo, solo 2020)             |
+| `left_join()`  | Une dos tablas, conservando todo lo de la primera |
+| `right_join()` | Conserva todo lo de la segunda                    |
+| `full_join()`  | Conserva todo de ambas                            |
+| `select(-col)` | Elimina una columna antes de unir                 |
+
+> Para esta parte, se necesita cargar al entorno R el archivo `datos_economicos.RData`, que trae las siquientes tablas:
+
+```{r}
+df_balanza
+df_desempleo
+df_inflacion
+df_pib
+```
+
+**Filtremos** para obtener los datos del **pib**, **desempleo** e **inflacion** del año **2020:**
+
+```{r}
+pib20 = df_pib %>% filter(año == 2020)        # PIB solo 2020
+des20 = df_desempleo %>% filter(año == 2020)  # Desempleo 2020
+inf20 = df_inflacion %>% filter(año == 2020)  # Inflación 2020
+```
+
+```{r}
+pib20
+des20 
+inf20 
+```
+
+Ahora hagamos consultas sobre estos datos usando **joins**.
+
+-   🧠 “Une la información de **PIB 2020** con la de **inflación** por **país y año**, manteniendo todos los datos del PIB del 2020 y agregando la inflación *solo si existe una coincidencia*.”:
+
+```{r}
+tabla_left <- left_join(pib20, inf20, by = c('pais', 'año'))
+tabla_left
+```
+
+
+
+> En `dplyr`, el argumento `by` funciona como si estuvieras indicando las claves (o "keys") por las que se deben unir las tablas, igual que harías con una clave primaria y una clave foránea en bases de datos.
+
+-   🧠 “Une la información de **inflación** a los datos del **PIB 2020** **solo por país**, **sin considerar el año**,manteniendo todos los datos del PIB del 2020 y agregando la inflación *solo si existe una coincidencia*.” 
+Esto puede provocar uniones incorrectas si hay varias filas por país en alguna tabla.:
+
+```{r}
+tabla_left1 = left_join(pib20, inf20 %>% select(-año), by = "pais")
+# inf20 %>% select(-año): elimina la columna año antes del join.
+tabla_left1
+```
+
+-   🧠 “Une la información del **PIB del 2020** a los datos de **inflación del 2020**, conservando todos los países con datos de **inflación** y agregando el **PIB** *solo si hay coincidencia por país y año*.”:
+
+```{r}
+tabla_right = right_join(pib20, inf20, by = c("pais", "año"))
+tabla_right
+```
+
+-   🧠 “Une la información de **inflación** a los datos de **desempleo** por **país y año**, manteniendo **todos los datos de desempleo** aunque no haya registro de inflación para ese país y año.( agregando la inflación *solo si existe una coincidencia*)”:
+
+```{r}
+# left_join(df_desempleo, df_inflacion, by = c("pais", "año")) %>% View()
+
+left_join(df_desempleo, df_inflacion, by = c("pais", "año"))
+```
+
+-   🧠 “Dame todos los países que estén en cualquiera de las dos tablas, aunque no coincidan. // Combina todos los datos de desempleo e inflación por país y año, incluso si no hay coincidencias entre ambas tablas.”:
+
+```{r}
+# full_join(df_desempleo, df_inflacion, by = c("pais", "año")) %>% View()
+full_join(df_desempleo, df_inflacion, by = c("pais", "año"))
+```
+
+[🔝 Volver a tabla de contenido](#tabla-de-contenido)
+
+# Gráficos {#gráficos}
+
+```{r}
+table(marketing$Education) 
+# Cuenta cuántas veces aparece cada nivel educativo
+# Devuelve una tabla de frecuencias
+```
+
+## Gráfico de barras {#gráfico-de-barras}
+
+```{r}
+barplot(table(marketing$Education))
+# Muestra un gráfico de barras básico con los conteos anteriores
+
+x = table(marketing$Education)
+barplot(x, main = "Nivel educativo", xlab = "Educacion", ylab = "Conteo", 
+        col = c("red", "magenta", "purple", "violetred", "pink"))
+```
+
+[🔝 Volver a tabla de contenido](#tabla-de-contenido)
+
+## Histogramas {#histogramas}
+
+```{r}
+hist(marketing$Income)
+
+hist(marketing$Income, xlim = c(0, 150000), breaks = 30, col = rainbow(10))
+
+```
+
+-   `xlim=c(0, 150000)`: recorta eje X
+-   `breaks=30`: más detalle en los bloques
+-   `col=rainbow(10)`: paleta de 10 colores
+
+```{r}
+histo1 = hist(marketing$Income, xlim = c(0, 150000), breaks = 50, col = rainbow(10))
+```
+
+[🔝 Volver a tabla de contenido](#tabla-de-contenido)
+
+## Boxplot ("Gráfico de caja") {#boxplot-gráfico-de-caja}
+
+Filtra para eliminar ingresos extremos (outliers): 
+```{r}
+marketing2 = marketing %>% filter(Income <= 200000)
+```
+
+Creamos el grafico de cajas
+
+```{r}
+cajita = boxplot(marketing2$Income, col = "orange")
+```
+
+### Mostramos cuartiles
+
+```{r}
+cajita$stats
+```
+`cajita$stats` Muestra: mínimo, 1er cuartil, mediana, 3er cuartil, máximo.
+
+
+### Muestra los valores atípicos detectados
+
+```{r}
+cajita$out
+```
+
+[🔝 Volver a tabla de contenido](#tabla-de-contenido)
